@@ -105,15 +105,13 @@ Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, 
 
 - **Incorporating Annealing Noise Schedule**
 
-  To improve convergence, the system employs an annealing noise schedule that adapts the noise variance σkσk over the iterations. The update rule, which now explicitly accounts for the noise level, is given by:
+  To improve convergence, the system employs an annealing noise schedule that adapts the noise variance $σ_k$ over the iterations. The update rule, which now explicitly accounts for the noise level, is given by:
 
   $$
   y^{(k+1)} = y^{(k)} + \eta \left( g_{\phi}(y^{(k)}; x; \sigma_k) - y^{(k)}\right)
   $$
 
-  where the $\sigma_k$ is the noise variance, Initially set to a relatively high value, the noise variance is gradually decreases with the iteractions. This approach helps the model correct large deviations in the early stages and fine-tune the estimate in later iterations.
-
-  This approach works as an adaptive correction method: higher noise levels assist in navigating larger errors by providing broader corrective signals, whereas lower noise levels enable precise adjustments as the solution nears equilibrium.
+  where the $\sigma_k$ is the noise variance. Initially set to a relatively high value, the noise variance is gradually decreases with the iteractions. This approach helps the model correct large deviations in the early stages and fine-tune the estimate in later iterations. Moreover, it works as an adaptive correction method: higher noise levels assist in navigating larger errors by providing broader corrective signals, whereas lower noise levels enable precise adjustments as the solution nears equilibrium.
 
 - **Convergence Criterion**
 
@@ -224,7 +222,7 @@ This serves as the baseline for assessing the impact of subsequent refinement.
 - **Model**: A comparable MLP model with increased capacity.
 - **Architecture**:
   - Two hidden layers interleaved by ReLU activation functions
-  - Number of parameters: 31,517 
+  - Number of parameters: 31517 
 - **Metric**: RMSQ (Root Mean Squared Error for the test set)
 - **Result**:
   - RMSQ Test Loss: **0.0341**
