@@ -200,7 +200,7 @@ The model has 23548 parameters in total.
 #### 1. Performance of the Direct Predictor
 
 - **Metric**: RMSE (Root Mean Squared Error)
-- **Result**: The direct predictor achieved an RMSE of **0.0380**.
+- **Result**: The direct predictor achieved an RMSE of **0.0345**.
 
 This serves as the baseline for assessing the impact of subsequent refinement.
 
@@ -213,9 +213,9 @@ This serves as the baseline for assessing the impact of subsequent refinement.
   - Number of iterations per noise level, $K=700$
   - Step-size (learning rate) for refinement, $\eta=10^{−3}$
 - **Metric**: RMSE of the refined predictions
-- **Result**: RMSE was significantly reduced to **0.0180**.
+- **Result**: RMSE was significantly reduced to **0.0168**.
 - **Gain**:
-  The iterative refinement process achieved a **50% reduction** in RMSE compared to the direct predictor, illustrating the effectiveness of the CDAE refinement in driving the predictions closer to equilibrium.
+  The iterative refinement process achieved a **51% reduction** in RMSE compared to the direct predictor, illustrating the effectiveness of the CDAE refinement in driving the predictions closer to equilibrium.
 
 
 
