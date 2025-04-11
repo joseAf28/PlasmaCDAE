@@ -1,5 +1,7 @@
 ## Autoencoder Enhanced Surrogate Model
 
+José Filipe Afonso  11/04/2025
+
 ### Introduction
 
 This work presents a progressive Conditional Denoising Autoencoder (CDAE) model designed for efficiently solving steady-state problems associated with plasma-surface interactions. Specifically, the model tackles equilibrium states described mathematically by the deterministic equation:
@@ -126,7 +128,7 @@ Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, 
   $$
   ∥ v(y^{(k)};x)∥_2  < \epsilon
   $$
-   
+  
   This threshold-based criterion ensures that the updates become negligibly small, indicating that $y^{(k)}$is essentially at an equilibrium state.
 
 - **Clipping of Updates**
