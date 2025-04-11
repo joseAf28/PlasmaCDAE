@@ -3,9 +3,11 @@
 ### Introduction
 
 This work presents a progressive Conditional Denoising Autoencoder (CDAE) model designed for efficiently solving steady-state problems associated with plasma-surface interactions. Specifically, the model tackles equilibrium states described mathematically by the deterministic equation:
+
 $$
 F(\vec{x}, \vec{y}) = 0
 $$
+
 Here, $\vec{x}$ represents known input parameters, and  $\vec{y}$  denotes corresponding equilibrium outputs.
 
 
@@ -17,9 +19,11 @@ The primary objective is developing a robust surrogate model that accurately pre
 So far, the approaches have been explored included predicted $\vec{y}$ directly from the $\vec{x}$ conditions using MLP models,  which effectively means that each of the predicted components $\hat{y}_i$ only effectively depends on the connections established between  the $\vec{x}$ components and their high-level representations, so that our problem is given by obtain the $f(\vec{x}; \theta)$, such that the pairs $(\vec{x}, f(\vec{x}))$ approximately satisfy $F(\vec{x}, f(\vec{x};\theta)) = 0$.
 
 Recently, the projection method was presented in *Physics-consistent machine learning: Output projection onto physical manifolds* . It comprises training a system $(\vec{x}, f(\vec{x}; \theta))$ using a MLP model , defining the physical constraints as equations $g(\vec{x}, \vec{y}) = 0$ and then projecting the predicted output $\hat{y}$ onto the constraint manifold by solving the following optimization problem:
+
 $$
 min⁡_p ∥p−f(x;Θ)∥_W^2 ~~ \text{s.t} ~~ g(x,p)=0
 $$
+
 In this way, the model predictions always comply with the specified physical laws, even if the model itself didn’t learn them well during training.
 
 This  work follows a different direction. Inspired by the fact that the pairs $(\vec{x}, \vec{y})$ are the fixed point solutions of $F(\vec{x}, \vec{y}) = 0$, we aspire to find a formulation that generally internalizes and learn the structure within $(\vec{x}, \vec{y})$ and not solely stick to connections established between $\vec{x}$ and/or through the constraints $g(\vec{x}, \vec{y}) =0$. 
@@ -42,19 +46,23 @@ The CDAE model is central to our methodology. It is designed to reconstruct equi
   $$
   
 - **Conditional Reconstruction**: The CDAE aims to reconstruct $y$ from the noisy observation  $\tilde{y}$  conditioned on inputs $\vec{x}$:
+  
   $$
   \hat{y} = g_\phi(\tilde{y}, x)
   $$
 
 - **Loss Function**: Training involves minimizing the mean squared reconstruction error between the true equilibrium outputs and their CDAE reconstructions:
+  
   $$
   \mathcal{L}_{CDAE}(\phi) = \mathbb{E}[\|g_\phi(\tilde{y}, x) - y\|^2_2]
   $$
 
 - **Corrective Vector Field**: Post-training, the CDAE implicitly defines a deterministic corrective vector field:
+  
   $$
   v(y; x; \sigma) = g_\phi(y; x; \sigma) - y
   $$
+
   This vector field guides iterative refinements toward equilibrium solutions.
 
 
@@ -86,17 +94,21 @@ $$
 - **Iterative Refinement**
 
 ​	The model iteratively refines the initial estimate using a learned corrective vector field derived from the denoising autoencoder (CDAE). At iteration $k$, the state is updated as:
+
 $$
 y^{(k+1)} = y^{(k)} + \eta~ v(y^{(k)}; x), \quad y^{(0)} = \hat{y}
 $$
+
 Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, tuning the magnitude of each update.
 
 - **Incorporating Annealing Noise Schedule**
 
   To improve convergence, the system employs an annealing noise schedule that adapts the noise variance σkσk over the iterations. The update rule, which now explicitly accounts for the noise level, is given by:
+
   $$
   y^{(k+1)} = y^{(k)} + \eta \left( g_{\phi}(y^{(k)}; x; \sigma_k) - y^{(k)}\right)
   $$
+
   where the $\sigma_k$ is the noise variance, Initially set to a relatively high value, the noise variance is gradually decreases with the iteractions. This approach helps the model correct large deviations in the early stages and fine-tune the estimate in later iterations.
 
   This approach works as an adaptive correction method: higher noise levels assist in navigating larger errors by providing broader corrective signals, whereas lower noise levels enable precise adjustments as the solution nears equilibrium.
@@ -104,21 +116,27 @@ Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, 
 - **Convergence Criterion**
 
   The equilibrium state $y^*$ is reached when the corrective vector vanishes:
+
   $$
   v(y^*; x) = g_{\phi}(y^*;x) - y
   $$
+
   Equivalently, convergence is defined by the norm of the corrective vector field falling below a small threshold $\epsilon$:
+
   $$
   ∥ v(y^{(k)};x)∥_2  < \epsilon
   $$
+   
   This threshold-based criterion ensures that the updates become negligibly small, indicating that $y^{(k)}$is essentially at an equilibrium state.
 
 - **Clipping of Updates**
 
   Clipping of the vector field updates is employed to maintain stability in the refinement dynamics and prevent the algorithm from overshooting the local basin of attraction. This means that if the magnitude of the update $\eta v(y^{(k)};x)$ exceeds a predetermined threshold, the update is scaled back:
+
   $$
   \Delta y^{(k)} = \text{clip}\left( \eta v(y^{(k)};x), \text{min}= -c, \max = c \right)
   $$
+
   where $c$ is the clipping constant. Clipping ensures that no single update is too large, preserving the local convergence properties and mitigating the risk of diverging from the equilibrium basin.
 
   
@@ -159,7 +177,7 @@ The CDAE model includes several key components:
 
   A dedicated sub-network processes the scalar noise into a higher-dimensional representation using two linear layers interleaved with a ReLu activation. This design improves the model's sensitivity to the noise scale.
 
-- **Input Concatenation **
+- **Input Concatenation**
 
   The input for the encoder is formed by concatenating the input $x$, the noisy output $\tilde{y}$ and the noise embedding. This enables the model to condition the encoding on both the observed corrupted output and the associated noise level.
 
@@ -244,7 +262,7 @@ Valente, Matilde, et al. "Physics-consistent machine learning: Output projection
 
 ### Appendix
 
-The implementation details are presented on the GitHub repo: 
+The implementation details are presented on the GitHub repo [https://github.com/joseAf28/PlasmaCDAE]
 
 In the following sections, we introduce different architectures that have also been explored, but whose results do not present a significant gain when compared to the simple direct predictor.
 
@@ -253,22 +271,28 @@ In the following sections, we introduce different architectures that have also b
 We explored an alternative autoregressive model characterized by predicting output components sequentially:
 
 - **Autoregressive Decomposition**: Each component $y_i$ of the output $y$  is predicted sequentially, conditioned on inputs \$x$ and all previously predicted components:
+  
   $$
   \hat{y}_i = h_i([\phi(x), \hat{y}_1, \hat{y}_2, \dots, \hat{y}_{i-1}])
   $$
+
   **Shared Backbone Network**: Input parameters $x$ are first transformed by a shared neural backbone network  $\phi(x)$ into a common latent space. Each sequential prediction is then performed by specific subnetworks $h_i(\cdot) $.
 
 - **Teacher Forcing with Cosine Scheduling**: During training, ground truth components $y_j$ and predicted components $\hat{y}_j$ are mixed according to a cosine annealing schedule:
+  
   $$
   y_j^{input} = \begin{cases}
   y_j^{true}, & \text{with probability } p(t) \\
   \hat{y}_j, & \text{with probability } 1 - p(t)
   \end{cases}
   $$
+
   where the scheduling function $p(t)$ is defined by:
+
   $$
   p(t) = p_{\text{min}} + \frac{1}{2}(p_{\text{max}} - p_{\text{min}})\left(1 + \cos\left(\pi \frac{t}{T}\right)\right)
   $$
+
   where $p_{\min}$ and $p_{\max}$ specify the minimum and maximum teacher forcing probabilities and $t$ denotes the current training step, and $T$ is the total number of training steps.
 
   This scheduling gradually shifts the network from relying heavily on the ground truth (at the beginning of training) to relying more on its predictions as training progresses.
@@ -315,9 +339,11 @@ This formulation leverages a conditional denoising autoencoder (CDAE) to learn a
 
 - **Mapping Network**:
   A separate network is trained to predict the latent space directly from the inputs xx. This network is then combined with the decoder to form a final predictor:
+
   $$
   \hat{y} =D(x,F(x))
   $$
+
   where $F(x)$ approximates the latent vector $z$ learned by the encoder.
 
 **Training Stages**:
