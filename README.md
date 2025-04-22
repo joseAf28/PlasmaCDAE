@@ -195,7 +195,7 @@ The model has 23548 parameters in total.
 
 ### Results
 
-![Results Panel](/Users/joseafonso/Desktop/Screenshot 2025-04-22 at 07.10.51.png)
+![Results Panel](results/panel_results.png)
 
 
 
