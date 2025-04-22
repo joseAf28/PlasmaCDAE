@@ -33,7 +33,7 @@ config_mapping = {
 
 
 config_refinement = {
-    "num_iters_per_level": 1000,
+    "num_iters_per_level": 1000, #1000
     "step_size": 1e-3,
     "eps_convergence": 1e-3,
     "eps_clip": 5e-2

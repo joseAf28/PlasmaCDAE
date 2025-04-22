@@ -3,6 +3,8 @@
 Attempts/
 Attempts2/
 old_models/
+old_results/
+figures/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

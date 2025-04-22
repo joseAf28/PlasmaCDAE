@@ -18,7 +18,7 @@ Here, $\vec{x}$ represents known input parameters, and  $\vec{y}$  denotes corre
 
 The primary objective is developing a robust surrogate model that accurately predicts equilibrium outputs based on specific input conditions. The equilibrium dataset is generated from solutions of deterministic steady-state differential equations modeling plasma-surface interactions.
 
-So far, the approaches have been explored included predicted $\vec{y}$ directly from the $\vec{x}$ conditions using MLP models,  which effectively means that each of the predicted components $\hat{y}_i$ only effectively depends on the connections established between  the $\vec{x}$ components and their high-level representations, so that our problem is given by obtain the $f(\vec{x}; \theta)$, such that the pairs $(\vec{x}, f(\vec{x}))$ approximately satisfy $F(\vec{x}, f(\vec{x};\theta)) = 0$.
+So far, the approaches have been explored included predicted $\vec{y}$ directly from the $\vec{x}$ conditions using MLP models, which effectively means that each of the predicted components $\hat{y}_i$ only effectively depends on the connections established between  the $\vec{x}$ components and their high-level representations, so that our problem is given by obtain the $f(\vec{x}; \theta)$, such that the pairs $(\vec{x}, f(\vec{x}))$ approximately satisfy $F(\vec{x}, f(\vec{x};\theta)) = 0$.
 
 Recently, the projection method was presented in *Physics-consistent machine learning: Output projection onto physical manifolds* . It comprises training a system $(\vec{x}, f(\vec{x}; \theta))$ using a MLP model , defining the physical constraints as equations $g(\vec{x}, \vec{y}) = 0$ and then projecting the predicted output $\hat{y}$ onto the constraint manifold by solving the following optimization problem:
 
@@ -34,7 +34,7 @@ This  work follows a different direction. Inspired by the fact that the pairs $(
 
 ### Dataset
 
-The dataset (*data_3000_points.txt*) is externally sourced from previously published work and made publicly available on GitHub  [https://github.com/matildevalente/physics_consistent_machine_learning/tree/main/data/ltp_system]. It comprises $3000$  input-output pairs $(\vec{x}, \vec{y})$, capturing equilibrium conditions across a variety of input conditions. In this system, $\vec{x}$ corresponds to the vector of experimental conditions, and $\vec{y}$ corresponds to the vector of the chemical species concentrations. The details of how it was generated and about the physical simulator are widely explained in REF Projection.
+The dataset (*data_3000_points.txt*) is externally sourced from previously published work and made publicly available on GitHub  [https://github.com/matildevalente/physics_consistent_machine_learning/tree/main/data/ltp_system]. It comprises $3000$ input-output pairs $(\vec{x}, \vec{y})$, capturing equilibrium conditions across a variety of input conditions. In this system, $\vec{x}$ corresponds to the vector of experimental conditions, and $\vec{y}$ corresponds to the vector of the chemical species concentrations. The details of how it was generated and about the physical simulator are widely explained in REF Projection.
 
 
 
@@ -111,7 +111,7 @@ Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, 
   y^{(k+1)} = y^{(k)} + \eta \left( g_{\phi}(y^{(k)}; x; \sigma_k) - y^{(k)}\right)
   $$
 
-  where the $\sigma_k$ is the noise variance. Initially set to a relatively high value, the noise variance is gradually decreases with the iteractions. This approach helps the model correct large deviations in the early stages and fine-tune the estimate in later iterations. Moreover, it works as an adaptive correction method: higher noise levels assist in navigating larger errors by providing broader corrective signals, whereas lower noise levels enable precise adjustments as the solution nears equilibrium.
+  where the $\sigma_k$ is the noise variance. Initially set to a relatively high value, the noise variance is gradually decreased with the iteractions. This approach helps the model correct large deviations in the early stages and fine-tune the estimate in later iterations. Moreover, it works as an adaptive correction method: higher noise levels assist in navigating larger errors by providing broader corrective signals, whereas lower noise levels enable precise adjustments as the solution nears equilibrium.
 
 - **Convergence Criterion**
 
@@ -149,7 +149,7 @@ Before training the model,standard scaling was applied to different sets. The tr
 
   Optimized by minimizing the direct prediction loss $\mathcal{L}_{pred}$ (MSE loss + $L_2$ regularization).
 
-  Uses an MLP with two hidden layers, ReLU activations, and a regularization term ($L_2$) with $λ_{reg}=10^{−5}$.
+  Uses an MLP with two hidden layers, ReLU activations, and a regularization term ($L_2$) with $λ_{reg}=10^{−5}$ and $1100$ epochs in the training.
 
   The model architecture is relatively compact, with 4217 parameters, making it a lightweight direct predictor.
 
@@ -195,39 +195,23 @@ The model has 23548 parameters in total.
 
 ### Results
 
-#### 1. Performance of the Direct Predictor
-
-- **Metric**: RMSE (Root Mean Squared Error)
-- **Result**: The direct predictor achieved an RMSE of **0.0345**.
-
-This serves as the baseline for assessing the impact of subsequent refinement.
+![Results Panel](/Users/joseafonso/Desktop/Screenshot 2025-04-22 at 07.10.51.png)
 
 
 
-#### 2. CDAE Refinement Results
+This panel presents the results of testing our novel architecture against a core baseline. All curves report the mean over five random seeds (shaded bands in **1a** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
 
-- **Refinement Process**: Iterative updates using the learned corrective vector field from the CDAE.
-- **Iterative Parameters**:
-  - Number of iterations per noise level, $K=700$
-  - Step-size (learning rate) for refinement, $\eta=10^{−3}$
-- **Metric**: RMSE of the refined predictions
-- **Result**: RMSE was significantly reduced to **0.0168**.
-- **Gain**:
-  The iterative refinement process achieved a **51% reduction** in RMSE compared to the direct predictor, illustrating the effectiveness of the CDAE refinement in driving the predictions closer to equilibrium.
+**Figure 1a** shows that, as we enlarge the direct‑map network, its RMSE (blue) declines, but appending our fixed‐size conditional denoising autoencoder (CDAE; $23 548$ params) on top yields an even lower error (orange) at all scales.
 
+**Figure 1b** plots the percentage RMSE reduction of CDAE over the direct map: it stays near $12\%$ regardless of backbone size, demonstrating a roughly constant refinement gain.
 
+**Figure 1c** isolates where extra capacity pays off by varying only one sub‑network at a time: Baseline direct map (blue), Map‑net scaling within CDAE (orange), and Core‑net (autoencoder) scaling within CDAE (green). The x-axis corresponds to the total number of architecture parameters.
 
-#### 3. Comparison with a Larger MLP Model
+**Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives up to $\sim 15 \%$ RMSE improvement, whereas adding the same budget to the core net gives only $\sim 5\%$. This suggests that future work could explore alternative core‑net designs.
 
-- **Model**: A comparable MLP model with increased capacity.
-- **Architecture**:
-  - Two hidden layers interleaved by ReLU activation functions
-  - Number of parameters: 31517 
-- **Metric**: RMSQ (Root Mean Squared Error for the test set)
-- **Result**:
-  - RMSQ Test Loss: **0.0341**
+**Figure 1e** sweeps the noise‐schedule levels in CDAE training (from $2$ up to $8$ of the standard $10$ between $10^{-4}$ and $0.3$). The gain steadily rises, from $\sim 6\%$ to $\sim 13\%$ , as more noise steps are included, underscoring the value of a progressive conditional denoising model.
 
-Despite having substantially more parameters, the larger MLP model did not achieve the same level of performance as the CDAE refinement approach. This comparison emphasizes that including the denoising iterative process and noise-augmented training leads to better generalization and lower error than simply increasing model size.
+Overall, our CDAE refinement consistently outperforms the direct-map baseline, with most of the scale benefit coming from the map net and additional advantage from richer noise schedules.
 
 
 
@@ -244,7 +228,7 @@ The results demonstrate that the CDAE surrogate model markedly enhances both the
 4. **Dependence on Initial Predictions**:
    The CDAE relies on an initial guess provided by a direct predictor. The refinement process improves the prediction iteratively, but its success is closely tied to the quality of the initial estimate. If the initial guess falls outside the local attractor basin of the correct equilibrium state, the refinement process may converge to an incorrect solution. This sensitivity underscores the importance of having a good base predictor to ensure the effectiveness of the iterative refinement.
 5. **Comparison with Score-Based and Diffusion Models**:
-   Unlike traditional methods, such as Langevin dynamics or forward processes commonly used in score-based generative models and diffusion models, designed to sample from a modeled distribution—your approach aims to converge to a specific equilibrium state. In diffusion models, guidance during inference (such as classifier-based guidance) can help steer the sampling process, which is not a factor in your deterministic scenario. Here, the focus is on refining a given initial guess rather than generating random samples, which highlights a significant difference between the two methodologies.
+   Unlike traditional methods, such as Langevin dynamics or forward processes commonly used in score-based generative models and diffusion models, designed to sample from a modeled distribution, this approach aims to converge to a specific equilibrium state. In diffusion models, guidance during inference (such as classifier-based guidance) can help steer the sampling process, which is not a factor in your deterministic scenario. Here, the focus is on refining a given initial guess rather than generating random samples, which highlights a significant difference between the two methodologies.
 
 ### References
 
