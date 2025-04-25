@@ -77,25 +77,27 @@ test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 ###* Define the CDAE  and train the model
 
-x_dim = cfg.config_cade["x_dim"]
-y_dim = cfg.config_cade["y_dim"]
-latent_dim = cfg.config_cade["latent_dim"]
-hidden_dim = cfg.config_cade["hidden_dim"]
-p_noise = cfg.config_cade["p_noise"]
+x_dim = cfg.config_cdaeV2["x_dim"]
+y_dim = cfg.config_cdaeV2["y_dim"]
+x_embed_dim = cfg.config_cdaeV2["x_embed_dim"]
+hidden_dim = cfg.config_cdaeV2["hidden_dim"]
+noise_embed_dim = cfg.config_cdaeV2["noise_embed_dim"]
 
-min_noise = cfg.config_cade["min_noise"]
-max_noise = cfg.config_cade["max_noise"]
-noise_schedule = np.linspace(max_noise, min_noise, num=cfg.config_cade["noise_schedule_dim"])
-noise_dim = cfg.config_cade["noise_dim"]
+p_noise = cfg.config_cdaeV2["p_noise"]
 
-
-
-cdae = models.ConditionalDenoisingAutoencoder(x_dim=x_dim, y_dim=y_dim, latent_dim=latent_dim, hidden_dim=hidden_dim, noise_embed_dim=noise_dim)
+min_noise = cfg.config_cdaeV2["min_noise"]
+max_noise = cfg.config_cdaeV2["max_noise"]
+noise_schedule = np.linspace(max_noise, min_noise, num=cfg.config_cdaeV2["noise_schedule_dim"])
+noise_dim = cfg.config_cdaeV2["noise_dim"]
 
 
-num_epochs = cfg.config_cade["num_epochs"]
-lr = cfg.config_cade["lr"]
-lambda_sparse = cfg.config_cade["lambda_sparse"]
+cdae = models.ConditionalDenoisingAutoencoderV2(x_dim=x_dim, y_dim=y_dim, \
+    x_embed_dim=x_embed_dim, hidden_dim=hidden_dim, noise_embed_dim=noise_embed_dim) 
+
+
+num_epochs = cfg.config_cdaeV2["num_epochs"]
+lr = cfg.config_ccdaeV2["lr"]
+lambda_sparse = cfg.config_cdaeV2["lambda_sparse"]
 
 optimizer = optim.Adam(cdae.parameters(), lr=lr)
 criterion = nn.MSELoss()

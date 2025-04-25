@@ -98,34 +98,10 @@ def train_system(seed, hidden_dim):
             return x
     
     
-    class EarlyStopping:
-        def __init__(self, patience=10, min_delta=0):
-            self.patience = patience
-            self.min_delta = min_delta
-            self.counter = 0
-            self.best_loss = None
-            self.early_stop = False
-            
-        
-        def __call__(self, val_loss):
-            if self.best_loss is None or val_loss < self.best_loss - self.min_delta:
-                self.best_loss = val_loss
-                self.counter = 0
-            else:
-                self.counter += 1
-                if self.counter >= self.patience:
-                    self.early_stop = True
-    
-    
-    # hidden_dim = 1500
-    # hidden_dim = 1700
-    
     model = SimpleRegressor(x_dim, hidden_dim, y_dim)
 
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-    # early_stopper = EarlyStopping(patience=3)
     
     n_epochs = 1100
     lambda_reg = 1e-5
@@ -181,12 +157,12 @@ if __name__ == "__main__":
     
     seed_vec = np.arange(1, 100, 20)
     
-    hidden_dim_vec = np.arange(1200, 3600, 300)
+    hidden_dim_vec = np.arange(1000, 4000, 300)
     print("Hidden dim vector: ", hidden_dim_vec)
     
     test_loss_vec = []
     
-    file_name = "simple_regressor_results_scaling_hidden_dimV3.txt"
+    file_name = "simple_regressor_results_scaling_hidden_dim_new.txt"
     
     with open(file_name, "w") as f:
         f.write("Seed: " + str(seed_vec) + "\n")

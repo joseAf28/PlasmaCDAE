@@ -6,15 +6,8 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
-
-import models
 import config as cfg
-
-
-# seed = cfg.config_set["seed"]
-
-# torch.manual_seed(seed)
-# np.random.seed(seed)
+import math
 
 
 class LTPDataset(Dataset):
@@ -32,6 +25,108 @@ class LTPDataset(Dataset):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
+
+class SinusoidalNoiseEmbedding(nn.Module):
+    def __init__(self, embed_dim: int = 64, max_freq: float = 1e4):
+        super().__init__()
+        self.embed_dim = embed_dim
+        half = embed_dim // 2
+        # Logarithmically spaced frequencies
+        self.freqs = nn.Parameter(
+            torch.exp(
+                torch.linspace(
+                    math.log(1.0), math.log(max_freq), half
+                )
+            ),
+            requires_grad=False
+        )
+        self.proj = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim),
+            nn.GELU(),
+            nn.Linear(embed_dim, embed_dim)
+        )
+
+    def forward(self, noise_level: torch.Tensor):
+        # noise_level: [batch_size, 1]
+        args = noise_level * self.freqs.unsqueeze(0)  # [B, half]
+        emb = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)  # [B, embed_dim]
+        return self.proj(emb)
+
+
+class FactorizedLinear(nn.Module):
+    
+    def __init__(self, in_features: int, out_features: int, rank: int = 32, bias: bool = True):
+        super().__init__()
+        self.factor1 = nn.Linear(in_features, rank, bias=False)
+        self.factor2 = nn.Linear(rank, out_features, bias=bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.factor2(self.factor1(x))
+
+
+
+class ConditionalDenoisingAutoencoderV2(nn.Module):
+    def __init__(
+        self,
+        x_dim: int,
+        y_dim: int,
+        x_embed_dim: int = 16,
+        hidden_dim: int = 64,
+        latent_dim: int = 32,
+        noise_embed_dim: int = 10,
+        factor_rank: int = 16
+    ):
+        super().__init__()
+        # Embed x once
+        self.x_proj = nn.Sequential(
+            nn.Linear(x_dim, x_embed_dim),
+            nn.GELU(),
+            nn.Linear(x_embed_dim, x_embed_dim)
+        )
+        # Sinusoidal noise embedding
+        self.noise_emb = SinusoidalNoiseEmbedding(noise_embed_dim)
+
+        # Initial projection of y_noisy
+        self.y_proj = nn.Sequential(
+            nn.Linear(y_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        
+        # Decoder: predict corrections for y
+        self.decoder = nn.Sequential(
+            nn.LayerNorm(hidden_dim + x_embed_dim + noise_embed_dim),
+            nn.Linear(hidden_dim + x_embed_dim + noise_embed_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, y_dim + x_dim)
+        )
+
+    def forward(self, x: torch.Tensor, y_noisy: torch.Tensor, noise_level: torch.Tensor):
+        # Embeddings
+        x_emb = self.x_proj(x)                        # [B, x_embed_dim]
+        noise_emb = self.noise_emb(noise_level)       # [B, noise_embed_dim]
+        h = self.y_proj(y_noisy)                      # [B, hidden_dim]
+        
+        # Decoder
+        dec_in = torch.cat([h, x_emb, noise_emb], dim=-1)
+        dec_out = self.decoder(dec_in)  # [B, x_dim + y_dim]
+        
+        return dec_out, h
+
+
+
+class MappingNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(MappingNet, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.relu = nn.ReLU()
+    
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
 
 
 def train_system(seed):
@@ -97,7 +192,7 @@ def train_system(seed):
     noise_schedule = np.linspace(max_noise, min_noise, num=noise_schedule_dim)
     noise_dim = cfg.config_cade["noise_dim"]
     
-    cdae = models.ConditionalDenoisingAutoencoder(x_dim=x_dim, y_dim=y_dim, latent_dim=latent_dim, hidden_dim=hidden_dim, noise_embed_dim=noise_dim)
+    cdae = ConditionalDenoisingAutoencoderV2(x_dim=x_dim, y_dim=y_dim)
 
     num_epochs = cfg.config_cade["num_epochs"]
     lr = cfg.config_cade["lr"]
@@ -106,7 +201,7 @@ def train_system(seed):
     optimizer = optim.Adam(cdae.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
-
+    print("parameters: ", count_parameters(cdae))
     print("TRAINING CDAE")
 
     cdae.train()
@@ -121,17 +216,20 @@ def train_system(seed):
             else:
                 y_noisy = y
                 noise_level = torch.zeros(x.size(0), 1)
+                
             
-            y_recon, latent = cdae(x, y_noisy, noise_level)
-            y_truth = torch.concat([x, y], dim=1)
+            vec_recon, latent = cdae(x, y_noisy, noise_level)
             
             loss_sparse = torch.mean(torch.abs(latent))
-            loss = criterion(y_recon, y_truth) + lambda_sparse * loss_sparse
+            
+            truth = torch.cat([x, y], dim=1)
+            
+            loss = criterion(truth, vec_recon) + lambda_sparse * loss_sparse
             
             loss.backward()
             optimizer.step()
             
-        if (epoch + 1) % 500 == 0:
+        if (epoch + 1) % 300 == 0:
             print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.6f}')
             
             with torch.no_grad():
@@ -145,10 +243,10 @@ def train_system(seed):
                         y_noisy_val = y_val
                         noise_level = torch.zeros(x_val.size(0), 1)
                     
-                    y_recon_val, _ = cdae(x_val, y_noisy_val, noise_level)
-                    y_truth_val = torch.concat([x_val, y_val], dim=1)
+                    vec_recon_val, _ = cdae(x_val, y_noisy_val, noise_level)
                     
-                    val_loss += criterion(y_recon_val, y_truth_val).item()
+                    truth = torch.cat([x_val, y_val], dim=1)
+                    val_loss += criterion(truth, vec_recon_val).item()
                 
                 val_loss /= len(val_dataloader)
                 print(f'Validation Loss CDAE: {val_loss:.6f}')
@@ -159,9 +257,11 @@ def train_system(seed):
     with torch.no_grad():
         for i, (x, y) in enumerate(test_dataloader):
             
-            y_recon, latent = cdae(x, y, torch.zeros(x.size(0), 1))
+            vec_recon, latent = cdae(x, y, torch.zeros(x.size(0), 1))
             
-            loss_value = criterion(y_recon, torch.concat([x, y], dim=1))
+            truth = torch.cat([x, y], dim=1)
+            
+            loss_value = criterion(truth, vec_recon)
             loss += loss_value.item()
         loss = loss / len(test_dataloader)
 
@@ -173,7 +273,7 @@ def train_system(seed):
 
     ####* Define and train the mapping function
 
-    map_net = models.MappingNet(input_dim=x_dim, hidden_dim=cfg.config_mapping["hidden_dim"], output_dim=y_dim)
+    map_net = MappingNet(input_dim=x_dim, hidden_dim=cfg.config_mapping["hidden_dim"], output_dim=y_dim)
 
     criterion_map = nn.MSELoss()
     optimizer_map = optim.Adam(map_net.parameters(), lr=lr)
@@ -243,10 +343,9 @@ def train_system(seed):
                 
                 with torch.no_grad():
                     noise_level_tensor = torch.full((x.size(0), 1), noise_level)
-                    recon, _ = cdae(x, y, noise_level_tensor)
+                    vec_recon, _ = cdae(x, y, noise_level_tensor)
                     
-                residual = recon - torch.cat([x, y], dim=1)
-                residual_y = residual[:, x_dim:] 
+                residual_y = vec_recon[:, x_dim:] - y
                 
                 if torch.norm(residual_y) < eps_conv:
                     break
@@ -299,7 +398,7 @@ if __name__ == "__main__":
     std_test_loss_map = np.std(np.sqrt(test_loss_map_vec))
     std_test_refine_loss = np.std(np.sqrt(test_refine_loss_vec))
     
-    with open("cdae_results_multiple_seeds_4.txt", "w") as f:
+    with open("cdae_results_multiple_seeds_new.txt", "w") as f:
         f.write("Test Loss Map: " + str(test_loss_map_vec) + "\n")
         f.write("Test Refine Loss: " + str(test_refine_loss_vec) + "\n")
         f.write("Seed: " + str(seed_vec) + "\n")

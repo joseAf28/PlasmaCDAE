@@ -5,6 +5,9 @@ Attempts2/
 old_models/
 old_results/
 figures/
+models_scaling/
+models_scaling2/
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

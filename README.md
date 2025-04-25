@@ -1,6 +1,6 @@
 ## Autoencoder Enhanced Surrogate Model
 
-José Filipe Afonso  11/04/2025
+José Filipe Afonso  25/04/2025
 
 ### Introduction
 
@@ -171,45 +171,80 @@ Before training the model,standard scaling was applied to different sets. The tr
 
 #### CDAE Model Implementation 
 
-The CDAE model includes several key components:
+The network we consider reconstructs a clean pair $(\hat{x}, \hat{y})$ from a noisy target $\tilde{y}$ conditioned on a context vector and explicit noise-level scalar $\sigma$.
 
-- **Noise Embedding**
+The forward pass is given by:
 
-  A dedicated sub-network processes the scalar noise into a higher-dimensional representation using two linear layers interleaved with a ReLu activation. This design improves the model's sensitivity to the noise scale.
+```txt
+x ──► x_proj ───────────────────┐
+              									│
+σ ──► SinusoidalNoiseEmbedding ─┼─► decoder ─► [ŷ,x̂]
+              									│
+y_noisy ─► y_proj ──────────────┘
 
-- **Input Concatenation**
+```
 
-  The input for the encoder is formed by concatenating the input $x$, the noisy output $\tilde{y}$ and the noise embedding. This enables the model to condition the encoding on both the observed corrupted output and the associated noise level.
+The architecture has the following features:
 
-- **Encoder and Decoder**
+- The encoding of the input noise scale uses a **sinusoidal noise embedding**. Given the noise embedding dimension, $d_{\sigma}$, we consider the following  $d_{\sigma}/2$ logarithmically-spaced frequencies:
+  $$
+  f_i = \exp \left( \ln 1 + \frac{i}{(d_{\sigma}/2) - 1}[\ln(\mathrm{max\_freq}) - \ln 1] \right), ~~~~i = 0, \dots, \frac{d_{\sigma}}{2}-1
+  $$
+  with $\text{max\_freq} = 10^{4}$. And we map the scalar noise level $\sigma$ to a length-$d_{\sigma}$ vector:
+  $$
+  e_{\mathrm{raw}}= [\sin(\sigma f_0), \dots, \sin(\sigma f_{d/2-1}),\cos(\sigma f_0), \dots, \cos(\sigma f_{d/2-1}) ] 
+  $$
+  This is identical to the positional encoding used in *Transformers*, but applied to the noise scale rather than token-index. 
 
-  The encoder consists of two linear layers followed by ReLU activations. The decoder re-integrates the input $x$ and the noise embedding with the latent vector, through two linear layers interleaved with a ReLU. In this way, we aim to reconstruct the clean output by exploiting the learned latent features and the original conditioning information.
+  Finally, we pass $e_{\mathrm{raw}}$ through a tiny MLP $(e_{\mathrm{raw}} \xrightarrow{} e_{\sigma})$ so that the network can *bend* the fixed sinusoid into any shape it finds useful.
 
-- **Forward Pass**:
+- The $x$ and $y$ are **encoded separately**. We consider different high-dimensional projections for $x$ and $y$:
+  $$
+  x \xrightarrow{W_x} \mathbb{R}^{d_x} ~~~~~ \tilde{y} \xrightarrow{W_{\tilde{y}}} \mathbb{R}^{d_{\tilde{y}}}
+  $$
+  In this way, $x$ side can be kept *thin* $(d_x = 16)$, while the $\tilde{y}$ path gets most of the capacity $(d_{\tilde{y}} = 104)$ and forces the model to treat $x$ as conditioning information: gradients form the loss only flow through $x$ via the final decoder.
 
-  The forward pass is given by embedding the noise level, concatenating the inputs, encoding to a latent space, and then decoding back to a reconstruction of the desired output.
+- The heavy lifting is postponed to the **decoder**. The separate embeddings act like *specialized feature extractors*. We use the *Late fusion* (concatenation + LayerNorm), which lets the decoder learn how much of each source it needs at every noise level. Mathematically, it is given by:
+  $$
+  z_{\mathrm{raw}} = [e_{\tilde{y}}~ || ~e_{x} ~ || ~ e_{\sigma} ] ~\in \mathbb{R}^D \newline
+  z = \mathrm{LN} (z_{\mathrm{raw}})
+  $$
+  and then $z$ is fed into the decoder's MLP layers.
 
-The model has 23548 parameters in total.
+
+
+Using these features, our conditional denoising autoencoder intends to have separate encoders that get *task-specific* features: the noisy-$y$ path can focus on purely on *denoising priors* and the $x$-path on conditional input features. Moreover, we keep the costly $y$-path wide and the cheap $x$-path think, saving params.  And the LayerNorm rescales the concatenated high-dimensional projection *features* to zero-mean and unit-var so the decoder sees a *balanced* vector each forward pass.
+
+#### Why this architecture does not collapse?
+
+A classical auto-encoder can indeed "collapse" into the identity mapping if the bottleneck is too wide (the case here). However, the **denoising autoencoder objective** averts that in two different ways:
+
+- **Noise Injection**: During training, the corrupted $\tilde{y}$ with sample noise. Reconstruction the *clean* $y$ is non-trivial and the neural network can never succeed by copying its input.
+- **Conditioning on $\sigma$**: The model must adjust its strategy as $\sigma$ varies (from almost-clean to heavily noisy). If it tried to ouput the identity matrix, it would incur a large loss for at least some $\sigma$ values, so the optimum necessarily preserves information
+
+
+
+The default model has $29337$ parameters.
 
 
 
 ### Results
 
-![Results Panel](results/panel_results.png)
+![](/Users/joseafonso/Desktop/PlasmaCDAE/figures/panelV2.png)
 
 
 
-This panel presents the results of testing our novel architecture against a core baseline. All curves report the mean over five random seeds (shaded bands in **1a** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
+This panel presents the results of testing our novel architecture against a core baseline. All curves report the RSME test loss over five random seeds (shaded bands in **1a** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
 
-**Figure 1a** shows that, as we enlarge the direct‑map network, its RMSE (blue) declines, but appending our fixed‐size conditional denoising autoencoder (CDAE; $23 548$ params) on top yields an even lower error (orange) at all scales.
+**Figure 1a** shows that, as we enlarge the direct‑map network, its RMSE (blue) declines, but appending our fixed‐size conditional denoising autoencoder (CDAE; $29337$ params) on top yields an even lower error (orange) at all scales.
 
-**Figure 1b** plots the percentage RMSE reduction of CDAE over the direct map: it stays near $12\%$ regardless of backbone size, demonstrating a roughly constant refinement gain.
+**Figure 1b** plots the percentage RMSE reduction of CDAE over the direct map: it stays near $25\%$ regardless of backbone size, demonstrating a roughly constant refinement gain.
 
 **Figure 1c** isolates where extra capacity pays off by varying only one sub‑network at a time: Baseline direct map (blue), Map‑net scaling within CDAE (orange), and Core‑net (autoencoder) scaling within CDAE (green). The x-axis corresponds to the total number of architecture parameters.
 
-**Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives up to $\sim 15 \%$ RMSE improvement, whereas adding the same budget to the core net gives only $\sim 5\%$. This suggests that future work could explore alternative core‑net designs.
+**Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives up to $\sim 20 \%$ RMSE improvement, whereas adding the same budget to the core net gives only up to $\sim 10\%$. 
 
-**Figure 1e** sweeps the noise‐schedule levels in CDAE training (from $2$ up to $8$ of the standard $10$ between $10^{-4}$ and $0.3$). The gain steadily rises, from $\sim 6\%$ to $\sim 13\%$ , as more noise steps are included, underscoring the value of a progressive conditional denoising model.
+**Figure 1e** sweeps the noise‐schedule levels in CDAE training (from $2$ up to $8$ of the standard $10$ between $10^{-4}$ and $0.3$). The gain steadily rises, from $\sim 7\%$ to $\sim 25\%$ , as more noise steps are included, underscoring the value of a progressive conditional denoising model.
 
 Overall, our CDAE refinement consistently outperforms the direct-map baseline, with most of the scale benefit coming from the map net and additional advantage from richer noise schedules.
 
@@ -220,7 +255,7 @@ Overall, our CDAE refinement consistently outperforms the direct-map baseline, w
 The results demonstrate that the CDAE surrogate model markedly enhances both the accuracy and reliability of predicting equilibrium states in deterministic plasma-surface interaction scenarios, outperforming traditional direct predictors. Several factors contribute to this improvement:
 
 1. **Learning Interdependencies**:
-   The CDAE is designed to capture and encode the complex interdependencies between the input variables $x$ and the output $y$.The model effectively learns a richer representation of the underlying relationships by conditioning the denoising process on both the input and the noisy output. This leads to more a robust and accurate reconstruction of equilibrium states.
+   The CDAE is designed to capture and encode the complex interdependencies between the input variables $x$ and the output $y$. The model effectively learns a richer representation of the underlying relationships by conditioning the denoising process on both the input and the noisy output. This leads to more a robust and accurate reconstruction of equilibrium states.
 2. **Scalability with Data and Output Dimensions**:
    Due to its ability to understand the intrinsic relationships between different components, the CDAE is expected to scale well with larger datasets and higher-dimensional outputs. As more training samples become available, or as the complexity of the interaction increases, the model’s performance can further improve, potentially outperforming models that do not explicitly model these interdependencies.
 3. **Data Intensity and Architectural Specificity**:

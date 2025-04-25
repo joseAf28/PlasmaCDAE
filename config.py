@@ -25,6 +25,25 @@ config_cade = {
 }
 
 
+config_cdaeV2 = {
+    "x_dim": 3,
+    "y_dim": 17,
+    "x_embed_dim": 16,
+    "hidden_dim": 104,
+    "noise_embed_dim": 10,
+    
+    "p_noise": 0.95,
+    "min_noise": 1e-4,
+    "max_noise": 0.3,
+    "noise_schedule_dim": 10,
+    "noise_dim": 5,
+    
+    "num_epochs": 1100,
+    "lr": 1e-3,
+    "lambda_sparse": 1e-5,
+}
+
+
 config_mapping = {
     "hidden_dim": 200,
     "lambda_reg": 1e-5,
