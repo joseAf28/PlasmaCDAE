@@ -18,7 +18,7 @@ Here, $\vec{x}$ represents known input parameters, and  $\vec{y}$  denotes corre
 
 The primary objective is developing a robust surrogate model that accurately predicts equilibrium outputs based on specific input conditions. The equilibrium dataset is generated from solutions of deterministic steady-state differential equations modeling plasma-surface interactions.
 
-So far, the approaches have been explored included predicted $\vec{y}$ directly from the $\vec{x}$ conditions using MLP models, which effectively means that each of the predicted components $\hat{y}_i$ only effectively depends on the connections established between  the $\vec{x}$ components and their high-level representations, so that our problem is given by obtain the $f(\vec{x}; \theta)$, such that the pairs $(\vec{x}, f(\vec{x}))$ approximately satisfy $F(\vec{x}, f(\vec{x};\theta)) = 0$.
+So far, the approaches have been explored included predicted $\vec{y}$ directly from the $\vec{x}$ conditions using MLP models, which effectively means that each of the predicted components $\hat{y}_i$ only depends on the connections established between  the $\vec{x}$ components and their high-level representations, so that our problem is given by obtain the $f(\vec{x}; \theta)$, such that the pairs $(\vec{x}, f(\vec{x}))$ approximately satisfy $F(\vec{x}, f(\vec{x};\theta)) = 0$.
 
 Recently, the projection method was presented in *Physics-consistent machine learning: Output projection onto physical manifolds* . It comprises training a system $(\vec{x}, f(\vec{x}; \theta))$ using a MLP model , defining the physical constraints as equations $g(\vec{x}, \vec{y}) = 0$ and then projecting the predicted output $\hat{y}$ onto the constraint manifold by solving the following optimization problem:
 
@@ -75,7 +75,7 @@ Moreover, rather than using a fixed noise level, a noise schedule allows the mod
 
 ### Relationship to Denoising Score Matching
 
-Our CDAE approach parallels the principles behind denoising score matching, commonly applied in stochastic generative models. Score matching involves learning gradients of log probability densities from noisy observations. However, instead of learning stochastic gradients, the CDAE directly learns a deterministic correction field, in our deterministic context,  Hence, while inspired by denoising score matching, our approach diverges by leveraging deterministic equilibrium conditions rather than stochastic processes.
+Our CDAE approach parallels the principles behind denoising score matching, commonly applied in stochastic generative models. Score matching involves learning gradients of log probability densities from noisy observations. However, in our deterministic context,instead of learning stochastic gradients, the CDAE directly learns a deterministic correction field.  Hence, while inspired by denoising score matching, our approach diverges by leveraging deterministic equilibrium conditions rather than stochastic processes.
 
 Moreover, architectures like diffusion and score-based models apply a gradual denoising process (from high to low noise) to reconstruct clean samples. Likewise, a noise schedule helps the CDAE "navigate " and correct trajectories from high-noise (off-manifold) states to low-noise equilibrium states.
 
@@ -143,7 +143,7 @@ Where $v(y^{(k)};x)=g_{\phi}(y^{(k)};x)−y^{(k)}$ and $\eta$ is the step size, 
 
 ### Training Methodology
 
-Before training the model,standard scaling was applied to different sets. The training stages correspond to two independent stages:
+Before training the model, standard scaling was applied to different sets. The training stages correspond to two independent stages:
 
 - **Direct Predictor Training:**
 
@@ -165,7 +165,7 @@ Before training the model,standard scaling was applied to different sets. The tr
 
 ​	**Optimizer**: Adam with a learning rate of $10^{−3}$
 
-​	**Dataset**:  Training set: 2550, Validation set: 135, Test set:  315, Batch size: 32
+​	**Dataset**:  Training set: 2550, Validation set: 135, Test set:  315 and Batch size: 32
 
 
 
@@ -206,11 +206,10 @@ The architecture has the following features:
 
 - The heavy lifting is postponed to the **decoder**. The separate embeddings act like *specialized feature extractors*. We use the *Late fusion* (concatenation + LayerNorm), which lets the decoder learn how much of each source it needs at every noise level. Mathematically, it is given by:
   $$
-  z_{\mathrm{raw}} = [e_{\tilde{y}}~ || ~e_{x} ~ || ~ e_{\sigma} ] ~\in \mathbb{R}^D \newline
+  z_{\mathrm{raw}} = [e_{\tilde{y}}~ || ~e_{x} ~ || ~ e_{\sigma} ] ~\in \mathbb{R}^D ~~~~D = d_{\tilde{y}} + d_x + d_{\sigma} \newline
   z = \mathrm{LN} (z_{\mathrm{raw}})
   $$
   and then $z$ is fed into the decoder's MLP layers.
-
 
 
 Using these features, our conditional denoising autoencoder intends to have separate encoders that get *task-specific* features: the noisy-$y$ path can focus on purely on *denoising priors* and the $x$-path on conditional input features. Moreover, we keep the costly $y$-path wide and the cheap $x$-path think, saving params.  And the LayerNorm rescales the concatenated high-dimensional projection *features* to zero-mean and unit-var so the decoder sees a *balanced* vector each forward pass.
@@ -230,11 +229,11 @@ The default model has $29337$ parameters.
 
 ### Results
 
+This panel presents the results of testing our novel architecture against a core baseline. All curves report the RSME test loss over five random seeds (shaded bands in **1a** and **1b** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
+
+
 ![](/Users/joseafonso/Desktop/PlasmaCDAE/figures/panelV2.png)
 
-
-
-This panel presents the results of testing our novel architecture against a core baseline. All curves report the RSME test loss over five random seeds (shaded bands in **1a** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
 
 **Figure 1a** shows that, as we enlarge the direct‑map network, its RMSE (blue) declines, but appending our fixed‐size conditional denoising autoencoder (CDAE; $29337$ params) on top yields an even lower error (orange) at all scales.
 
@@ -242,7 +241,7 @@ This panel presents the results of testing our novel architecture against a core
 
 **Figure 1c** isolates where extra capacity pays off by varying only one sub‑network at a time: Baseline direct map (blue), Map‑net scaling within CDAE (orange), and Core‑net (autoencoder) scaling within CDAE (green). The x-axis corresponds to the total number of architecture parameters.
 
-**Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives up to $\sim 20 \%$ RMSE improvement, whereas adding the same budget to the core net gives only up to $\sim 10\%$. 
+**Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives at least $\sim 20 \%$ RMSE improvement, whereas adding the same budget to the core net gives at least $\sim 10\%$.
 
 **Figure 1e** sweeps the noise‐schedule levels in CDAE training (from $2$ up to $8$ of the standard $10$ between $10^{-4}$ and $0.3$). The gain steadily rises, from $\sim 7\%$ to $\sim 25\%$ , as more noise steps are included, underscoring the value of a progressive conditional denoising model.
 
@@ -274,6 +273,8 @@ Ho, J., Jain, A., & Abbeel, P. (2020). Denoising Diffusion Probabilistic Models.
 Song, Y. & Ermon, S. (2019). *Generative Modeling by Estimating Gradients of the Data Distribution.* Advances in Neural Information Processing Systems (NeurIPS).
 
 Belanger, D., & McCallum, A. (2016). *Structured Prediction Energy Networks*.
+
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). Attention Is All You Need. arXiv preprint arXiv:1706.03762.
 
 Valente, Matilde, et al. "Physics-consistent machine learning: Output projection onto physical manifolds." *arXiv preprint*arXiv:2502.15755 (2025).
 
@@ -377,7 +378,7 @@ The training is divided into three main steps:
 
 **Performance and Limitations**:
 
-In a proof-of-concept experiment using a previously presented dataset, the latent space–based model achieved an RMSE test loss of approximately $0.03636$. The latent space has a low dimensionality ($∣z∣=4$), ensuring that the model captures a compact representation. The model comprises the mapping network (which predicts the latent space from $x$) and the decoder (which predicts $y$ from $z$), consisting of $5821$ parameters.
+In a proof-of-concept experiment using a previously presented dataset, the latent space–based model achieved an RMSE test loss of approximately $0.03636$. The latent space has a low dimensionality $(∣z∣=4)$, ensuring that the model captures a compact representation. The model comprises the mapping network (which predicts the latent space from $x$) and the decoder (which predicts $y$ from $z$), consisting of $5821$ parameters.
 
 Compared to the direct predictor—which achieved a lower RMSE—the gain provided by the latent space formulation is low (around $5\%$). This marginal improvement suggests that the increased complexity introduced by the latent space approach is poorly justified for our system. One potential reason for this limited gain is that the output space is only $17$ dimensions, which is not very high-dimensional. When the dimensionality is relatively low, learning the output directly from the input is already manageable, and the additional step of constructing a latent representation does not confer a significant advantage.
 
