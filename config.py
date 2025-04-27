@@ -47,7 +47,7 @@ config_cdaeV2 = {
 config_mapping = {
     "hidden_dim": 200,
     "lambda_reg": 1e-5,
-    "num_epochs": 770
+    "num_epochs": 1100 # 770
 }
 
 

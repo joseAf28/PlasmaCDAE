@@ -232,7 +232,7 @@ The default model has $29337$ parameters.
 This panel presents the results of testing our novel architecture against a core baseline. All curves report the RSME test loss over five random seeds (shaded bands in **1a** and **1b** show $\pm1$ std). The baseline is a neural network matching the direct‑map architecture, with varying hidden‑layer sizes, trained identically to our models.
 
 
-![](/Users/joseafonso/Desktop/PlasmaCDAE/figures/panelV2.png)
+![](/Users/joseafonso/Desktop/PlasmaCDAE/figures/panelV3.png)
 
 
 **Figure 1a** shows that, as we enlarge the direct‑map network, its RMSE (blue) declines, but appending our fixed‐size conditional denoising autoencoder (CDAE; $29337$ params) on top yields an even lower error (orange) at all scales.
@@ -243,7 +243,9 @@ This panel presents the results of testing our novel architecture against a core
 
 **Figure 1d** then shows these relative gains versus the baseline: enlarging the map net drives at least $\sim 20 \%$ RMSE improvement, whereas adding the same budget to the core net gives at least $\sim 10\%$.
 
-**Figure 1e** sweeps the noise‐schedule levels in CDAE training (from $2$ up to $8$ of the standard $10$ between $10^{-4}$ and $0.3$). The gain steadily rises, from $\sim 7\%$ to $\sim 25\%$ , as more noise steps are included, underscoring the value of a progressive conditional denoising model.
+**Figure 1e** illustrates the levels of the noise schedule used in CDAE training, ranging from 2 to 20 equally spaced levels between $10^{-4}$ and $0.3$. The RMSE error for the CDAE decreases from  $\sim 0.06$ to $ \sim 0.045$ as more noise steps are incorporated. This underscores the effectiveness of a progressive conditional denoising model.
+
+**Figure 1f** illustrates the results of the RMSE for the CDAE refinement as a function of the maximum noise level included in the noise schedule. We consider $10$ equally spaced values ranging from $10^{-4}$ to the maximum noise level at each point. The graph shows that the CDAE refinement error steadily decreases until $\sim 0.4$, where we reach the global minimum. After this point, the error increases as the maximum noise level rises. However, this increase occurs slowly, even with a maximum level of $1.5$, indicating that the learned corrective field of the CDAE is robust to the initial estimate of the $\hat{y}$ prediction.
 
 Overall, our CDAE refinement consistently outperforms the direct-map baseline, with most of the scale benefit coming from the map net and additional advantage from richer noise schedules.
 
